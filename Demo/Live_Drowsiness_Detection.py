@@ -4,7 +4,45 @@ from keras.models import load_model
 import numpy as np
 from pygame import mixer
 import time
+import threading
 
+
+class TimerTask:
+
+    def __init__(self):
+        self._running = True
+        global n, isSum
+        n = 0
+        isSum = None
+        print("TimerTask init")
+
+    def run(self):
+        print("TimerTask run")
+        global n
+        while self._running:
+            if isSum:
+                n += 1
+            elif isSum is False:
+                n -= 1
+            time.sleep(1)
+            #print(isSum,n)
+
+    def terminate(self):
+        self._running = False
+
+    def increment(self, value):
+        global isSum
+        isSum = value
+
+    def reset(self):
+        global isSum,n
+        isSum = None
+        n = 0
+
+
+timer_thread = TimerTask()
+t = threading.Thread(target = timer_thread.run)
+t.start()
 
 mixer.init()
 sound = mixer.Sound('Alarms/alarm.wav')
@@ -74,18 +112,24 @@ while True:
 
     if rpred[0] == 0 and lpred[0] == 0:
         score = score+1
-        start_time = time.time()
+        timer_thread.increment(True)
+        #start_time = time.time()
         cv2.putText(frame, "Closed", (10, height-20), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
     # if(rpred[0]==1 or lpred[0]==1):
     else:
         score = score-1
-        start_time = 0
+        #start_time = 0
+        timer_thread.increment(False)
         cv2.putText(frame, "Open", (10, height-20), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
 
-    if score < 0:
+    if score < 0 or n < 0:
         score = 0
+        timer_thread.reset()
+
     cv2.putText(frame, 'Score:'+str(score), (100, height-20), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
-    if score>15:
+    cv2.putText(frame, 'Timer:' + str(n), (210, height - 20), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
+
+    if score > 15:
         #person is feeling sleepy so we beep the alarm
         cv2.imwrite(os.path.join(path, 'image.jpg'), frame)
         try:
@@ -101,6 +145,7 @@ while True:
         cv2.rectangle(frame, (0, 0), (width, height), (0, 0, 255), thicc)
     cv2.imshow('frame', frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
+        timer_thread.terminate()
         break
 cap.release()
 cv2.destroyAllWindows()

@@ -5,7 +5,12 @@ import numpy as np
 from pygame import mixer
 import time
 import threading
+import sys
 
+if sys.version_info[0] >= 3:
+    import PySimpleGUI as sg
+else:
+    import PySimpleGUI27 as sg
 
 class TimerTask:
 
@@ -42,6 +47,28 @@ class TimerTask:
         isSum = None
         timer = 0
 
+# Soglia del riconoscimento facciale
+recThreshold = 10
+
+
+def createSettingsWindow():
+
+    slider_layout = [
+        [sg.Slider(range=(2, 30), default_value=recThreshold, key='recThreshold', size=(20, 15), orientation='horizontal', font=('Helvetica', 12)),sg.Text('NOTA: Se gli occhi non vengono riconosciuti,\nabbassare la soglia')]
+    ]
+
+    layout_setting = [
+        [sg.Text(' '*25), sg.Text('Impostazioni', font=("Helvetica", 15)), sg.Text(' '*25), sg.Image(filename='Images/settings1.png', size=(50, 50))],
+        [sg.Frame('Soglia riconoscimento facciale', slider_layout, font='Any 11', title_color='black', pad=(10, 20))],
+        [sg.Text('_' * 70)],
+        [sg.Button('Cancel', font='Any 1', image_filename='Images/x.png', image_subsample=9, button_color=('White', sg.theme_background_color()), border_width=0),
+         sg.Button('Submit', font='Any 1', image_filename='Images/ok.png', image_subsample=9, button_color=('White', sg.theme_background_color()), border_width=0)]]
+    # Creazione della finestra di settings
+    window_setting = sg.Window('Impostazioni', use_default_focus=False)
+    window_setting.Layout(layout_setting).Finalize()
+
+    return window_setting
+
 
 timer_thread = TimerTask()
 t = threading.Thread(target=timer_thread.run)
@@ -54,8 +81,17 @@ sound = mixer.Sound('Alarms/beep_tone.wav')
 leye = cv2.CascadeClassifier('Haarcascades/haarcascade_lefteye_2splits.xml')
 reye = cv2.CascadeClassifier('Haarcascades/haarcascade_righteye_2splits.xml')
 
+# Tema della GUI
+sg.ChangeLookAndFeel('Reddit')
 
-#lbl = ['Close', 'Open']
+# Layout della finestra principale
+layout = [[sg.Image(filename='', key='image')],
+            [sg.Button('Exit', font='Any 1', image_filename='Images/exit.png', image_subsample=9, button_color=('#F0F0F0', sg.theme_background_color()), border_width=0),
+             sg.Button('Settings', font='Any 1', image_filename='Images/settings.png', image_subsample=9, button_color=('#F0F0F0', sg.theme_background_color()), border_width=0)]]
+
+# Creazione della finestra principale
+main_window = sg.Window('AgeReg', use_default_focus=False, location=(200, 200))
+main_window.Layout(layout).Finalize()
 
 model = load_model('Models/firstModel.h5')
 #path = os.getcwd()
@@ -72,6 +108,8 @@ IMG_HEIGHT = 52
 IMG_WIDTH = 52
 
 if cap.isOpened():
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     cap_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)   # float
     cap_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
     #print(cv2.CAP_PROP_FRAME_WIDTH, cv2.CAP_PROP_FRAME_HEIGHT) # 3, 4
@@ -95,11 +133,36 @@ textX = int((cap_width - textsize[0]) / 2)
 textY = int((cap_height + textsize[1]) / 2)
 
 while True:
+    button, values = main_window._ReadNonBlocking()
+
+    if button is 'Exit' or values is None:
+        print("[INFO] Exit button was pressed. Closing the program.")
+        timer_thread.terminate()
+        cap.release()
+        sys.exit(0)
+    elif button == 'Settings':
+        print("[INFO] Settings button was pressed.")
+        settings_window = createSettingsWindow()
+        while True:
+            settings_button, setting_values = settings_window.Read()
+
+            if settings_button == 'Submit':
+                print("[INFO] Settings button was pressed.")
+                #global recThreshold
+                recThreshold = int(setting_values['recThreshold'])
+                settings_window.close()
+                break
+
+            if settings_button == 'Cancel' or settings_button == sg.WIN_CLOSED:
+                print("[INFO] Cancel button was pressed.")
+                settings_window.close()
+                break
+
     ret, frame = cap.read()
     height, width = frame.shape[:2]
     lpredindex, rpredindex = None, None
-    left_eye = leye.detectMultiScale(frame, minNeighbors=10)
-    right_eye = reye.detectMultiScale(frame, minNeighbors=10)
+    left_eye = leye.detectMultiScale(frame, minNeighbors=recThreshold)
+    right_eye = reye.detectMultiScale(frame, minNeighbors=recThreshold)
     #cv2.rectangle(frame, (0, height-50), (200, height), (0, 0, 0), thickness=cv2.FILLED)
 
     for (x, y, w, h) in left_eye:
@@ -137,7 +200,7 @@ while True:
         break
 
     #print(lpredindex,rpredindex)
-    if lpredindex == 0 and rpredindex == 0:
+    if lpredindex == 0 or rpredindex == 0:
         timer_thread.increment(True)
         cv2.putText(frame, "Closed", (10, height-20), font, 1, (255, 255, 255), 1, cv2.LINE_AA)
     else:
@@ -167,11 +230,16 @@ while True:
         
         cv2.rectangle(frame, (0, 0), (width, height), (0, 0, 255), marginThickness)
         '''
-    cv2.imshow('Driver Drowsiness Detection System', frame)
+    #cv2.imshow('Driver Drowsiness Detection System', frame)
+
+    imgbytes = cv2.imencode('.png', frame)[1].tobytes()
+    main_window.FindElement('image').update(data=imgbytes)
+
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         timer_thread.terminate()
         break
 
-cap.release()
-cv2.destroyAllWindows()
+#cap.release()
+#cv2.destroyAllWindows()
+

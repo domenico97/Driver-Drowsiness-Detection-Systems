@@ -104,8 +104,8 @@ rpred = [0]
 lpred = [0]
 lpredindex = None
 rpredindex = None
-IMG_HEIGHT = 52
-IMG_WIDTH = 52
+IMG_HEIGHT = 24
+IMG_WIDTH = 24
 
 if cap.isOpened():
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)

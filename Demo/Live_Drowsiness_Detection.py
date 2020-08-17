@@ -90,10 +90,10 @@ layout = [[sg.Image(filename='', key='image')],
              sg.Button('Settings', font='Any 1', image_filename='Images/settings.png', image_subsample=9, button_color=('#F0F0F0', sg.theme_background_color()), border_width=0)]]
 
 # Creazione della finestra principale
-main_window = sg.Window('AgeReg', use_default_focus=False, location=(200, 200))
+main_window = sg.Window('Driver Drowsiness Detection', use_default_focus=False, location=(200, 200))
 main_window.Layout(layout).Finalize()
 
-model = load_model('Models/firstModel.h5')
+model = load_model('Models/img_14_0.25_3CL_0.2.h5')
 #path = os.getcwd()
 cap = cv2.VideoCapture(0)
 font = cv2.FONT_HERSHEY_COMPLEX_SMALL
